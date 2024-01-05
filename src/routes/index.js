@@ -11,7 +11,7 @@ const SALT = 10;
 const router = express.Router();
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service : "gmail",
   auth: {
     user: process.env.SENDER_EMAIL,
     pass: process.env.SENDER_EMAIL_PASS,
@@ -94,6 +94,90 @@ router.post('/login', async (req, res) => {
     } catch (err) {
       console.log(err);
     }    
+});
+
+
+router.post('/login2', async (req, res) => {
+  
+  try {      
+    const { username, password } = req.body;
+    const email = username;
+    
+    const PHash = password;
+        // Make sure there is an Email and Password in the request
+        if (!(email && password)) {
+            res.status(400).send("All input is required");
+        }
+            
+        let user = undefined;
+        
+        var sql = "SELECT * FROM users WHERE email = ?";
+        db.all(sql, email, function(err, rows) {
+            if (err){
+                res.status(400).json({"error": err.message})
+                return;
+            }
+
+            user = rows[0];
+            
+            
+            //user exist
+            if(!user) return res.status(404).send("Usuario no encontrado.");
+            
+            //password validate
+            if(!bcrypt.compareSync(PHash, user.password)) return res.status(401).send("Password incorrecto.");
+            
+            //create jwt token
+            const expires = 24 * 60 * 60;
+            const token = jwt.sign(
+                { user_id: user.id},
+                  TOKEN_KEY,
+                  { expiresIn: expires }              
+            );
+
+            user.Token = token;
+
+           return res.status(200).send(user);                
+        });	
+    
+    } catch (err) {
+      console.log(err);
+    }    
+});
+
+router.post('/loginAdmin', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // Verificar si las credenciales son para el usuario admin
+    if (username === 'admin' && password === 'admin') {
+      // Crear un objeto de usuario simulado para el admin
+      const adminUser = {
+        id: 1,  // Puedes asignar un ID específico para el admin
+        username: 'admin',
+        // ... otros datos del usuario
+      };
+
+      // Crear un token (simulado) para el admin
+      const expires = 24 * 60 * 60;
+      const token = jwt.sign(
+        { user_id: adminUser.id },
+        TOKEN_KEY,
+        { expiresIn: expires }
+      );
+
+      adminUser.Token = token;
+
+      // Enviar una respuesta exitosa con el objeto del admin y el token
+      return res.status(200).send(adminUser);
+    } else {
+      // Si las credenciales no son para el admin, devolver un error
+      return res.status(401).send("Credenciales incorrectas para admin");
+    }
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Error en el servidor');
+  }
 });
 
 router.post('/request-reset', async (req, res) => {
